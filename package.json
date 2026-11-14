@@ -8,6 +8,7 @@
     "dev": "vite",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build",
+    "build:store": "SPAREPAGE_STORE=1 npm run build",
     "build:nocheck": "vite build",
     "preview": "vite preview",
     "test": "vitest run",

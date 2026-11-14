@@ -33,9 +33,11 @@ The toolbar icon opens a demo document that works with no Google setup at all.
    Without the variable, the build uses the team's development client in
    `manifest.config.ts`, which only works for the extension ID it was registered with.
 
-An unpacked extension's ID depends on the folder path, so each developer either registers
-their own client or loads from the same path. The Chrome Web Store build gets its own
-fixed ID, so a store build needs an OAuth client registered for that ID.
+Local builds (`npm run build`) carry the Chrome Web Store item's public key (`src/lib/extensionKey.ts`),
+so every copy has the same ID, `ckpmdoeegcphjabkldemolclppipjkan`, whatever folder it is loaded
+from. Register the Chrome extension OAuth client for that one ID. The package uploaded to the
+store is built with `npm run build:store`, which leaves the key out because the store adds its own.
+The ID is the same either way.
 
 ## 3. Check it works
 

@@ -1,4 +1,5 @@
 import { defineManifest } from '@crxjs/vite-plugin'
+import { EXTENSION_KEY } from './src/lib/extensionKey'
 
 // The OAuth client is bound to one extension ID. Local unpacked builds use the dev client
 // below; the Chrome Web Store assigns its own ID, so store builds pass the client registered
@@ -7,11 +8,17 @@ const OAUTH_CLIENT_ID =
   process.env.SPAREPAGE_OAUTH_CLIENT_ID ??
   '415665395282-ci25olqg8gn4qjcbljgiqi9mobo282c2.apps.googleusercontent.com'
 
+// Local builds carry the Chrome Web Store's public key, so every copy has the store's ID and one
+// Google sign-in client works for all of them. The package uploaded to the store must not have
+// it, so `npm run build:store` sets SPAREPAGE_STORE=1 to leave it out.
+const forStore = process.env.SPAREPAGE_STORE === '1'
+
 // Manifest V3. crxjs reads this and emits dist/manifest.json with hashed asset paths.
 export default defineManifest({
   manifest_version: 3,
   name: 'SparePage: Eco Formatting for Docs',
-  version: '0.2.0',
+  version: '0.2.1',
+  ...(forStore ? {} : { key: EXTENSION_KEY }),
   description:
     'Spots print waste in Google Docs (highlights, big fonts, blank pages, wordy text) and fixes it in one click. Runs in your browser.',
   icons: {
