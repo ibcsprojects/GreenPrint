@@ -375,6 +375,11 @@ describe('blankPage detection (trailing blanks spilling to an empty page)', () =
     expect(f!.action.kind).toBe('removeBlankLines')
   })
 
+  it('does not flag a single trailing blank on a multi-page doc when it adds no page', () => {
+    // 7 content lines at lpp 5 → 2 pages either way; the blank only fills spare room on page 2.
+    expect(analyzeDoc(trailingDoc(7, 1, 5)).some((x) => x.type === 'blankPage')).toBe(false)
+  })
+
   it('does not flag a lone trailing blank that sits right after a table', () => {
     const d = rebuildOffsets({
       id: 'd',

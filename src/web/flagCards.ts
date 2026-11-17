@@ -38,8 +38,15 @@ export function renderFlagCards(flags: Flag[], o: CardOptions): HTMLUListElement
     li.append(el('p', 'fx-why', f.explanation))
     if (f.before || f.after) {
       const diff = el('p', 'fx-diff')
-      if (f.before) diff.append(el('span', 'fx-before', clip(f.before)))
-      if (f.after) diff.append(el('span', 'fx-after', clip(f.after)))
+      const before = el('span', 'fx-before', clip(f.before))
+      const after = el('span', 'fx-after', clip(f.after))
+      // Highlight flags carry the same text both sides; show the highlight, then the underline.
+      if (f.type === 'highlight') {
+        before.style.cssText = 'background:#fde68a;text-decoration:none'
+        after.style.textDecoration = 'underline'
+      }
+      if (f.before) diff.append(before)
+      if (f.after) diff.append(after)
       li.append(diff)
     }
     if (f.reviewFirst) {

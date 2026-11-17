@@ -1,6 +1,7 @@
 import { useStore } from '../store'
 import { totalImpact } from '../../lib/analyzer/rules'
 import { progressScore } from '../../lib/progress'
+import { formatPages } from './flagMeta'
 
 /** Summary strip under the panel header: score, issue count, page count, total saving. */
 export function EcoScore() {
@@ -76,7 +77,3 @@ export function EcoScore() {
   )
 }
 
-function formatPages(p: number): string {
-  if (p >= 1) return `${p.toFixed(1)} pages`
-  return `${Math.round(p * 100)}% of a page`
-}

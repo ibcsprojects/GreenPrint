@@ -40,7 +40,7 @@ function DemoPage() {
       <div className="min-h-full pb-24">
         <header className="sticky top-0 z-10 border-b border-black/5 bg-white/90 backdrop-blur">
           <div className="mx-auto flex max-w-5xl items-center gap-3 px-6 py-3">
-            <img src={chrome.runtime.getURL('icons/icon48.png')} alt="" className="h-7 w-7" />
+            <img src={chrome.runtime.getURL('icons/sparepages-svg.svg')} alt="" className="h-7 w-7" />
             <div className="leading-tight">
               <div className="text-sm font-semibold text-bark-900">SparePage demo</div>
               <div className="text-xs text-bark-700/80">

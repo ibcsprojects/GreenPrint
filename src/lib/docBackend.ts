@@ -237,9 +237,14 @@ export class GoogleDocsBackend implements EditBackend {
 
   /**
    * Replace a run of bullets with a real Google Docs table, in two passes:
-   *  1. strip the bullet list and insert an *empty* table where it was;
+   *  1. remove the bullet list and insert an *empty* table where it was;
    *  2. re-read the doc to learn each cell's index, then fill the cells (highest index
    *     first, so earlier insertions don't shift the ones still to come).
+   *
+   * No blank lines may be left around the table, or the fix gives back the space it saves.
+   * insertTable always adds a newline *before* the table, so the table is attached to the end
+   * of the paragraph above (that newline then just ends it). That paragraph's own newline
+   * lands after the table as an empty line, which pass 2 deletes.
    */
   private async applyBulletsToTable(
     doc: DocModel,
@@ -251,33 +256,53 @@ export class GoogleDocsBackend implements EditBackend {
     if (bullets.length === 0) return fetchGoogleDoc(this.documentId)
 
     const layout = tableLayout(action.rows)
-    const startIndex = bullets[0].docStart!
-    const endIndex = bullets[bullets.length - 1].docEnd! - 1 // keep one trailing newline
+    const first = bullets[0]
+    const last = bullets[bullets.length - 1]
+    const startIndex = first.docStart!
+    // The body's final newline can't be deleted; anywhere else the bullets go entirely.
+    const atEnd = last.docEnd === Math.max(...doc.paragraphs.map((p) => p.docEnd ?? 0))
+    const endIndex = atEnd ? last.docEnd! - 1 : last.docEnd!
+    // Attach to the paragraph above unless there is none, or it's a table / page break
+    // (a table needs a paragraph between it and another table).
+    const prev = doc.paragraphs[doc.paragraphs.indexOf(first) - 1]
+    const attach =
+      prev != null && prev.docEnd === startIndex && prev.kind !== 'table' && prev.kind !== 'pageBreak'
 
-    // Pass 1: drop the list formatting + text, then insert the empty grid at its start.
+    // Pass 1: drop the list formatting + text, then insert the empty grid.
     const setup: unknown[] = []
-    if (endIndex > startIndex) {
-      const range = { startIndex, endIndex }
-      setup.push({ deleteParagraphBullets: { range } })
-      setup.push({ deleteContentRange: { range } })
+    if (last.docEnd! - 1 > startIndex) {
+      setup.push({ deleteParagraphBullets: { range: { startIndex, endIndex: last.docEnd! - 1 } } })
     }
+    if (endIndex > startIndex) setup.push({ deleteContentRange: { range: { startIndex, endIndex } } })
     setup.push({
       insertTable: {
         rows: layout.rows,
         columns: layout.columns,
-        location: { index: startIndex },
+        location: { index: attach ? startIndex - 1 : startIndex },
       },
     })
     await pushBatchUpdate(this.documentId, setup)
 
-    // Pass 2: locate the new table's cells and fill them in descending-index order.
+    // Pass 2: locate the new table's cells and fill them in descending-index order, after
+    // deleting the empty line pass 1 left below the table (it's past every cell, so first).
     const raw = await fetchGoogleDocRaw(this.documentId)
     const cellStarts = tableCellStarts(raw, startIndex)
-    const fill = cellStarts
-      .map((index, i) => ({ index, text: layout.cells[i] ?? '' }))
-      .filter((c) => c.text.length > 0)
-      .sort((a, b) => b.index - a.index)
-      .map((c) => ({ insertText: { location: { index: c.index }, text: c.text } }))
+    const fill: unknown[] = []
+    const content = raw.body?.content ?? []
+    const t = content.findIndex((el) => el.table && (el.startIndex ?? -1) >= startIndex)
+    const below = t >= 0 ? content[t + 1] : undefined
+    const blank = below?.paragraph?.elements?.every((e) => !e.textRun || e.textRun.content === '\n')
+    // Keep it if it's the document's last paragraph: a table can't end the body.
+    if (attach && blank && content[t + 2] && below!.startIndex != null && below!.endIndex != null) {
+      fill.push({ deleteContentRange: { range: { startIndex: below!.startIndex, endIndex: below!.endIndex } } })
+    }
+    fill.push(
+      ...cellStarts
+        .map((index, i) => ({ index, text: layout.cells[i] ?? '' }))
+        .filter((c) => c.text.length > 0)
+        .sort((a, b) => b.index - a.index)
+        .map((c) => ({ insertText: { location: { index: c.index }, text: c.text } })),
+    )
     if (fill.length) await pushBatchUpdate(this.documentId, fill)
 
     return fetchGoogleDoc(this.documentId)

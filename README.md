@@ -83,10 +83,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for how to run it and the ground rules, a
 Report security problems privately to security@sparepage.app (see [SECURITY.md](SECURITY.md)). For
 anything else, email support@sparepage.app or open an issue.
 
-## Credits
-
-Created by Manav Purswani and Cata Gamero.
-
 ## Disclaimer
 
 SparePage is an independent open-source project. It is not affiliated with, endorsed by or sponsored by Google. Google, Google Docs and Chrome are trademarks of Google LLC. The software is provided "as is" under the MIT licence, without warranty. It edits your document only when you click Apply, and Google Docs keeps version history so you can restore an earlier copy.

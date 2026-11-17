@@ -3,7 +3,7 @@
 // there is no server and no AI, so no document text ever leaves the device.
 
 import type { DocModel, Paragraph } from '../docModel.js'
-import { paragraphText, stripBulletGlyph, hasWideIndent, wideIndentSides, INDENT_KEEP_PT } from '../docModel.js'
+import { paragraphText, stripBulletGlyph, hasWideIndent, wideIndentSides } from '../docModel.js'
 import type { EcoImpact, Flag, Range } from './types.js'
 import { analyzeWordiness } from './condense.js'
 import { tableLayout } from '../tableLayout.js'
@@ -53,8 +53,9 @@ function detectHighlights(doc: DocModel): Flag[] {
           title: 'Highlighted text wastes ink',
           explanation:
             'Background highlights flood the page with ink when printed. Underline conveys the same emphasis using a fraction of the ink.',
-          before: `"${truncate(r.text)}"`,
-          after: `U̲n̲d̲e̲r̲l̲i̲n̲e̲ "${truncate(r.text)}"`,
+          // Same text both sides; the card draws it highlighted, then underlined.
+          before: truncate(r.text),
+          after: truncate(r.text),
           impact: { paper: 0, ink: 0.9 * (r.text.length / 200) },
           action: { kind: 'removeHighlight', range, alt: 'underline' },
         })
@@ -86,8 +87,8 @@ function detectFontSize(doc: DocModel): Flag[] {
           range,
           title: `Body text is ${r.fontSize}pt`,
           explanation: `This paragraph is set at ${r.fontSize}pt. Dropping body text to ${to}pt keeps it readable while fitting more on each page.`,
-          before: `${r.fontSize}pt — "${truncate(r.text)}"`,
-          after: `${to}pt — "${truncate(r.text)}"`,
+          before: `${r.fontSize}pt`,
+          after: `${to}pt`,
           impact,
           action: { kind: 'setFontSize', range, from: r.fontSize, to },
         })
@@ -160,11 +161,11 @@ function detectBlankPage(doc: DocModel): Flag[] {
   const createsExtraPage = totalPages > contentPages
 
   // A single trailing blank is the document's natural last paragraph on most docs, so only
-  // flag it on a multi-page document and when it can actually be removed (the paragraph
-  // before it isn't a table — that lone blank is the required separator after a table).
+  // flag it when it's the reason for an extra page and it can actually be removed (the
+  // paragraph before it isn't a table — that lone blank is the required separator after one).
   const before = paras[start - 1]
   if (trailing.length < 2) {
-    if (totalPages < 2 || !before || before.kind === 'table') return []
+    if (!createsExtraPage || !before || before.kind === 'table') return []
   }
 
   const single = trailing.length === 1
@@ -183,8 +184,8 @@ function detectBlankPage(doc: DocModel): Flag[] {
       explanation: createsExtraPage
         ? 'Empty line(s) at the end of the document run onto a new, almost-blank page — a whole wasted sheet. Removing them pulls everything back onto the previous page.'
         : 'Empty lines at the end of the document only pad it out and can spill onto an extra page.',
-      before: `${trailing.length} blank line${single ? '' : 's'} at the end`,
-      after: createsExtraPage ? 'Empty page removed' : single ? 'Removed' : '1 blank line',
+      before: `${trailing.length} blank line${single ? '' : 's'}`,
+      after: createsExtraPage || single ? 'Removed' : '1 blank line',
       impact: {
         paper: createsExtraPage
           ? totalPages - contentPages
@@ -212,8 +213,8 @@ function detectPageBreaks(doc: DocModel): Flag[] {
         title: 'Hard page break',
         explanation:
           'A forced page break can leave most of a sheet blank. A horizontal line separates sections without burning a whole page.',
-        before: '⤓ Page break (rest of sheet blank)',
-        after: '──────  horizontal line  ──────',
+        before: 'Page break',
+        after: 'Horizontal line',
         impact: { paper: 0.4, ink: 0 },
         action: { kind: 'pageBreakToRule', range },
       })
@@ -266,8 +267,8 @@ function detectBulletSprawl(doc: DocModel): Flag[] {
         title: `${bullets.length} short bullets`,
         explanation:
           'A long column of tiny bullets uses one line each. A compact table fits the same items in far less vertical space.',
-        before: `${bullets.length} bullets, 1 line each`,
-        after: `Table — ${layout.rows} rows × ${layout.columns} cols`,
+        before: `${bullets.length} bullets`,
+        after: `${layout.rows}×${layout.columns} table`,
         impact: {
           // One line per bullet today vs. roughly one line per grid row in the table.
           paper: charsToPaper(Math.max(0, bullets.length - layout.rows) * CHARS_PER_LINE, doc),
@@ -327,7 +328,6 @@ function detectLargeImages(doc: DocModel): Flag[] {
       if (ratio <= IMAGE_AREA_LIMIT) continue
       // Scale both dimensions by √(target/ratio) so the area lands near the limit.
       const scale = Math.sqrt(IMAGE_AREA_LIMIT / ratio)
-      const newW = Math.round(img.widthPt * scale)
       const newH = Math.round(img.heightPt * scale)
       const pct = Math.round(ratio * 100)
       const range: Range = { start: p.start!, end: p.end! }
@@ -339,8 +339,8 @@ function detectLargeImages(doc: DocModel): Flag[] {
         title: `Image fills ${pct}% of the page`,
         explanation:
           'A large image dominates the page, pushing text onto extra sheets and soaking the paper in ink when printed. Scaling it down keeps it clear while freeing space.',
-        before: `${Math.round(img.widthPt)}×${Math.round(img.heightPt)}pt — ${pct}% of page`,
-        after: `${newW}×${newH}pt — ~${Math.round(IMAGE_AREA_LIMIT * 100)}% of page`,
+        before: `${pct}% of page`,
+        after: `${Math.round(IMAGE_AREA_LIMIT * 100)}% of page`,
         impact: {
           // Vertical space reclaimed on the page, plus a rough ink saving from less fill.
           paper: Math.max(0, (img.heightPt - newH) / CONTENT_HEIGHT_PT),
@@ -415,8 +415,8 @@ function detectWideMargins(doc: DocModel): Flag[] {
       title: 'Wide margins',
       explanation:
         'Some page margins are larger than the default, shrinking the printable area and pushing text onto extra pages. Resetting just those reclaims space without touching your tighter margins.',
-      before: 'Oversized margins',
-      after: 'Default margins where it saves paper',
+      before: 'Wide',
+      after: 'Default',
       impact: { paper: fractionSaved * basePages, ink: 0 },
       action: { kind: 'setMargins', range, ...next },
     },
@@ -457,8 +457,8 @@ function detectWideIndents(doc: DocModel): Flag[] {
       title: `${wide.length} indented paragraph${wide.length === 1 ? '' : 's'}`,
       explanation:
         'Wide left/right indents narrow each line, pushing text onto extra pages. Pulling these paragraphs back to the margin fits more on every line. Small indents are left alone.',
-      before: `${wide.length} paragraph${wide.length === 1 ? '' : 's'} indented past ${+(INDENT_KEEP_PT / 72).toFixed(2)}in`,
-      after: 'Indents removed (text back to the margin)',
+      before: 'Indented',
+      after: 'At the margin',
       impact: { paper: Math.max(0, linesSaved / doc.linesPerPage), ink: 0 },
       action: { kind: 'reduceIndents', range },
     },

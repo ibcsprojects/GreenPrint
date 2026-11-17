@@ -36,28 +36,14 @@ function Chevron({ expanded }: { expanded: boolean }) {
   )
 }
 
-/** "saves N" summary for one flag's impact, shown when the card is open. */
-function impactLabel(flag: Flag): string {
-  const parts: string[] = []
-  if (flag.impact.paper > 0.001) parts.push(`saves ${formatPages(flag.impact.paper)}`)
-  if (flag.impact.ink > 0.001) parts.push('less ink')
-  return parts.join(', ')
-}
-
-/** Compact version for the collapsed header, so the title keeps the room. */
-function shortImpact(paper: number, ink: number): string {
-  if (paper > 0.001) return paper >= 1 ? `${paper.toFixed(1)} pg` : `${Math.max(1, Math.round(paper * 100))}% pg`
-  return ink > 0.001 ? 'ink' : ''
-}
-
 /** Expanded card content. Appears instantly, for the same reason as the chevron. */
 function Reveal({ children }: { children: React.ReactNode }) {
   return <div>{children}</div>
 }
 
 /**
- * The interactive body of one issue: explanation, before → after preview, the rewrite's
- * individual changes, and the apply / dismiss / edit controls.
+ * The interactive body of one issue: a short Now → Fix preview, the rewrite's individual
+ * changes, and the apply / dismiss / edit controls.
  */
 function FlagIssueBody({ flag, showTitle = false }: { flag: Flag; showTitle?: boolean }) {
   const apply = useStore((s) => s.apply)
@@ -68,16 +54,17 @@ function FlagIssueBody({ flag, showTitle = false }: { flag: Flag; showTitle?: bo
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(flag.editableSuggestion ?? '')
   const rewrites = flag.rewrites ?? []
+  const hl = flag.type === 'highlight'
 
   return (
     <>
       {showTitle && <h3 className="text-[13px] font-semibold text-bark-900">{flag.title}</h3>}
-      <p className="mt-1 text-[12px] leading-relaxed text-bark-700/80">{flag.explanation}</p>
-
-      <dl className="mt-2 space-y-1 rounded-lg bg-leaf-50/70 p-2 text-[12px]">
+      <dl className="mt-1 space-y-1 rounded-lg bg-leaf-50/70 p-2 text-[12px]">
         <div className="flex gap-2">
           <dt className="w-9 shrink-0 font-medium text-clay-700">Now</dt>
-          <dd className="text-bark-700/80 line-through decoration-clay-600/40">{flag.before}</dd>
+          <dd className={hl ? 'text-bark-900' : 'text-bark-700/80 line-through decoration-clay-600/40'}>
+            {hl ? <mark className="bg-amber-200 text-inherit">{flag.before}</mark> : flag.before}
+          </dd>
         </div>
         <div className="flex gap-2">
           <dt className="w-9 shrink-0 font-medium text-leaf-700">Fix</dt>
@@ -90,6 +77,8 @@ function FlagIssueBody({ flag, showTitle = false }: { flag: Flag; showTitle?: bo
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
               />
+            ) : hl ? (
+              <span className="underline">{flag.after}</span>
             ) : (
               flag.after
             )}
@@ -162,7 +151,7 @@ function FlagIssueBody({ flag, showTitle = false }: { flag: Flag; showTitle?: bo
           onClick={() => reveal(flag.id)}
           className="ml-auto rounded-lg px-2 py-1.5 text-[12px] font-medium text-bark-700/80 hover:bg-leaf-50 hover:text-leaf-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-leaf-600"
         >
-          Show
+          Find
         </button>
       </div>
     </>
@@ -185,7 +174,6 @@ export function FlagCard({
   onToggle: (open: boolean) => void
 }) {
   const reveal = useStore((s) => s.reveal)
-  const impact = impactLabel(flag)
 
   // Opening a card also scrolls the document to it, so the user sees it in context.
   const toggle = () => {
@@ -201,20 +189,12 @@ export function FlagCard({
         <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-bark-900">
           {flag.title}
         </span>
-        {!expanded && impact && (
-          <span className="shrink-0 text-[11px] tabular-nums text-bark-700/80" title={impact}>
-            {shortImpact(flag.impact.paper, flag.impact.ink)}
-          </span>
-        )}
         <Chevron expanded={expanded} />
       </button>
       {expanded && (
         <Reveal>
           <div className="border-t border-leaf-100 px-3 pb-3 pt-2.5">
-            <div className="flex items-center gap-2">
-              <FlagChip flag={flag} />
-              {impact && <span className="ml-auto text-[11px] text-bark-700/80">{impact}</span>}
-            </div>
+            <FlagChip flag={flag} />
             <FlagIssueBody flag={flag} />
           </div>
         </Reveal>
@@ -238,7 +218,6 @@ export function FlagGroupCard({
     (acc, f) => (SEVERITY_RANK[f.severity] > SEVERITY_RANK[acc] ? f.severity : acc),
     'low',
   )
-  const paper = flags.reduce((s, f) => s + f.impact.paper, 0)
 
   const toggle = () => {
     const next = !expanded
@@ -253,11 +232,6 @@ export function FlagGroupCard({
         <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-bark-900">
           {flags.length} issues in one spot
         </span>
-        {!expanded && paper > 0.001 && (
-          <span className="shrink-0 text-[11px] tabular-nums text-bark-700/80" title={`saves ${formatPages(paper)}`}>
-            {shortImpact(paper, 0)}
-          </span>
-        )}
         <Chevron expanded={expanded} />
       </button>
       {expanded && (
@@ -267,9 +241,6 @@ export function FlagGroupCard({
               <div key={flag.id} className="rounded-lg border border-leaf-100 bg-leaf-50/40 p-2.5">
                 <div className="mb-1 flex items-center gap-2">
                   <FlagChip flag={flag} />
-                  {impactLabel(flag) && (
-                    <span className="ml-auto text-[11px] text-bark-700/80">{impactLabel(flag)}</span>
-                  )}
                 </div>
                 <FlagIssueBody flag={flag} showTitle />
               </div>
@@ -281,7 +252,3 @@ export function FlagGroupCard({
   )
 }
 
-function formatPages(p: number): string {
-  if (p >= 1) return `${p.toFixed(1)} pages`
-  return `${Math.max(1, Math.round(p * 100))}% of a page`
-}
