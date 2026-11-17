@@ -1,14 +1,11 @@
 import { useStore } from '../store'
 import { totalImpact } from '../../lib/analyzer/rules'
 import { progressScore } from '../../lib/progress'
-import { formatPages } from './flagMeta'
 
-/** Summary strip under the panel header: score, issue count, page count, total saving. */
+/** Summary strip under the panel header: score, issue count, total saving. */
 export function EcoScore() {
   const flags = useStore((s) => s.flags)
   const peak = useStore((s) => s.peakFlags)
-  const pages = useStore((s) => s.pages)
-  const pagesExact = useStore((s) => s.pagesExact)
   const loading = useStore((s) => s.loading)
   const doc = useStore((s) => s.doc)
 
@@ -20,7 +17,8 @@ export function EcoScore() {
   const score = progressScore(flags.length, peak)
   const fixed = Math.max(0, peak - flags.length)
   const tone = score >= 80 ? 'text-leaf-600' : score >= 40 ? 'text-amber-500' : 'text-clay-600'
-  const saved = impact.paper >= 0.05
+  const paper = impact.paper >= 0.05
+  const ink = impact.ink > 0.1
 
   return (
     <div className="flex items-center gap-3 border-b border-leaf-100 bg-white px-3.5 py-3">
@@ -52,24 +50,16 @@ export function EcoScore() {
               ? `${flags.length} left, ${fixed} fixed`
               : `${flags.length} issue${flags.length === 1 ? '' : 's'} found`}
         </div>
-        <div className="text-bark-700/80">
-          {pagesExact ? (
-            <>
-              {pages} page{pages === 1 ? '' : 's'}
-            </>
-          ) : (
-            <>
-              About {pages} page{pages === 1 ? '' : 's'}{' '}
-              <span className="rounded bg-leaf-50 px-1 py-px text-[10px] font-medium text-bark-700/80">
-                estimate
+        {(paper || ink) && (
+          <div className="mt-0.5 text-bark-700/80">
+            Save{' '}
+            {paper && (
+              <span className="font-semibold text-leaf-700">
+                {impact.paper.toFixed(1)} page{impact.paper.toFixed(1) === '1.0' ? '' : 's'}
               </span>
-            </>
-          )}
-        </div>
-        {saved && (
-          <div className="font-medium text-leaf-700">
-            Fixing all saves about {formatPages(impact.paper)}
-            {impact.ink > 0.1 ? ' and ink' : ''}
+            )}
+            {paper && ink ? ' and ' : ' '}
+            {ink ? 'printer ink ' : ''}with these changes!
           </div>
         )}
       </div>

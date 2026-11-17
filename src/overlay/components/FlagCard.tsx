@@ -3,11 +3,9 @@
 // FlagGroupCard, so the user sees one card per place in the document.
 
 import { useState } from 'react'
-import type { Flag, Severity } from '../../lib/analyzer/types'
+import type { Flag } from '../../lib/analyzer/types'
 import { useStore } from '../store'
-import { FLAG_META, SEVERITY_DOT } from './flagMeta'
-
-const SEVERITY_RANK: Record<Severity, number> = { low: 0, medium: 1, high: 2 }
+import { FLAG_META, TYPE_DOT } from './flagMeta'
 
 /** The category chip shown for each issue. */
 function FlagChip({ flag }: { flag: Flag }) {
@@ -45,7 +43,7 @@ function Reveal({ children }: { children: React.ReactNode }) {
  * The interactive body of one issue: a short Now → Fix preview, the rewrite's individual
  * changes, and the apply / dismiss / edit controls.
  */
-function FlagIssueBody({ flag, showTitle = false }: { flag: Flag; showTitle?: boolean }) {
+function FlagIssueBody({ flag }: { flag: Flag }) {
   const apply = useStore((s) => s.apply)
   const dismiss = useStore((s) => s.dismiss)
   const reveal = useStore((s) => s.reveal)
@@ -58,7 +56,6 @@ function FlagIssueBody({ flag, showTitle = false }: { flag: Flag; showTitle?: bo
 
   return (
     <>
-      {showTitle && <h3 className="text-[13px] font-semibold text-bark-900">{flag.title}</h3>}
       <dl className="mt-1 space-y-1 rounded-lg bg-leaf-50/70 p-2 text-[12px]">
         <div className="flex gap-2">
           <dt className="w-9 shrink-0 font-medium text-clay-700">Now</dt>
@@ -185,7 +182,11 @@ export function FlagCard({
   return (
     <div className={CARD}>
       <button type="button" onClick={toggle} aria-expanded={expanded} className={HEAD}>
-        <span className={`h-2 w-2 shrink-0 rounded-full ${SEVERITY_DOT[flag.severity]}`} aria-hidden />
+        <span
+          className={`h-2 w-2 shrink-0 rounded-full ${TYPE_DOT[flag.type].dot}`}
+          title={TYPE_DOT[flag.type].name}
+          aria-hidden
+        />
         <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-bark-900">
           {flag.title}
         </span>
@@ -202,53 +203,3 @@ export function FlagCard({
     </div>
   )
 }
-
-/** Several flags that share one snippet, stacked under a single card. */
-export function FlagGroupCard({
-  flags,
-  expanded,
-  onToggle,
-}: {
-  flags: Flag[]
-  expanded: boolean
-  onToggle: (open: boolean) => void
-}) {
-  const reveal = useStore((s) => s.reveal)
-  const topSeverity = flags.reduce<Severity>(
-    (acc, f) => (SEVERITY_RANK[f.severity] > SEVERITY_RANK[acc] ? f.severity : acc),
-    'low',
-  )
-
-  const toggle = () => {
-    const next = !expanded
-    onToggle(next)
-    if (next) void reveal(flags[0].id)
-  }
-
-  return (
-    <div className={CARD}>
-      <button type="button" onClick={toggle} aria-expanded={expanded} className={HEAD}>
-        <span className={`h-2 w-2 shrink-0 rounded-full ${SEVERITY_DOT[topSeverity]}`} aria-hidden />
-        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-bark-900">
-          {flags.length} issues in one spot
-        </span>
-        <Chevron expanded={expanded} />
-      </button>
-      {expanded && (
-        <Reveal>
-          <div className="space-y-2 border-t border-leaf-100 p-3">
-            {flags.map((flag) => (
-              <div key={flag.id} className="rounded-lg border border-leaf-100 bg-leaf-50/40 p-2.5">
-                <div className="mb-1 flex items-center gap-2">
-                  <FlagChip flag={flag} />
-                </div>
-                <FlagIssueBody flag={flag} showTitle />
-              </div>
-            ))}
-          </div>
-        </Reveal>
-      )}
-    </div>
-  )
-}
-

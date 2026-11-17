@@ -540,3 +540,37 @@ describe('rebuildOffsets', () => {
     }
   })
 })
+
+describe('fontSize detection', () => {
+  const sizedDoc = (paras: [kind: 'bullet' | 'normal', size: number][]): DocModel =>
+    rebuildOffsets({
+      id: 'd',
+      title: 't',
+      defaultFontSize: 11,
+      linesPerPage: 46,
+      paragraphs: paras.map(([kind, fontSize], i) => ({
+        id: `p${i}`,
+        kind,
+        runs: [{ text: `Point number ${i} of the list.`, fontSize }],
+      })),
+    })
+  const fontFlags = (d: DocModel) => analyzeDoc(d).filter((f) => f.type === 'fontSize')
+
+  it('gives a run of same-size oversized bullets one card covering them all', () => {
+    const d = sizedDoc(Array.from({ length: 20 }, () => ['bullet', 14] as ['bullet', number]))
+    const f = fontFlags(d)
+    expect(f).toHaveLength(1)
+    expect(f[0].range).toEqual({ start: d.paragraphs[0].start, end: d.paragraphs[19].runs[0].end })
+  })
+
+  it('splits where the size changes or normal-size text sits in between', () => {
+    const d = sizedDoc([
+      ['bullet', 14],
+      ['bullet', 14],
+      ['normal', 11],
+      ['bullet', 14],
+      ['bullet', 16],
+    ])
+    expect(fontFlags(d).map((f) => f.before)).toEqual(['14pt', '14pt', '16pt'])
+  })
+})

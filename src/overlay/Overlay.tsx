@@ -4,7 +4,7 @@
 // mount.tsx, so Google Docs' styles can't reach it and ours can't leak out.
 
 import { useEffect, useRef, useState } from 'react'
-import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
+import { AnimatePresence, MotionConfig, motion, useDragControls, useMotionValue, type DragControls, type MotionValue } from 'framer-motion'
 import { canOpenHistory, useStore } from './store'
 import { FlagList } from './components/FlagList'
 import { EcoScore } from './components/EcoScore'
@@ -23,6 +23,10 @@ export function Overlay({ anchor }: { anchor?: () => DOMRect | null }) {
   const open = useStore((s) => s.open)
   const init = useStore((s) => s.init)
   const offset = useEditorCorner(anchor)
+  // Where the panel has been dragged to, kept here so it reopens in the same spot.
+  const dragX = useMotionValue(0)
+  const dragY = useMotionValue(0)
+  const bounds = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     void init()
@@ -30,11 +34,13 @@ export function Overlay({ anchor }: { anchor?: () => DOMRect | null }) {
 
   return (
     <MotionConfig reducedMotion="user">
+      {/* The panel can be dragged anywhere inside the window, but not off it. */}
+      <div ref={bounds} className="pointer-events-none fixed inset-0" aria-hidden />
       <div
         className="pointer-events-none fixed z-[2147483000] flex flex-col items-end font-sans text-bark-900 antialiased"
         style={{ right: offset.right, bottom: offset.bottom }}
       >
-        <AnimatePresence>{open && <Panel key="panel" maxHeight={offset.maxHeight} width={offset.width} />}</AnimatePresence>
+        <AnimatePresence>{open && <Panel key="panel" maxHeight={offset.maxHeight} width={offset.width} x={dragX} y={dragY} bounds={bounds} />}</AnimatePresence>
       </div>
       <PageTab anchor={anchor} />
     </MotionConfig>
@@ -193,10 +199,23 @@ function PageTab({ anchor }: { anchor?: () => DOMRect | null }) {
   )
 }
 
-function Panel({ maxHeight, width }: { maxHeight: number; width: number }) {
+function Panel({
+  maxHeight,
+  width,
+  x,
+  y,
+  bounds,
+}: {
+  maxHeight: number
+  width: number
+  x: MotionValue<number>
+  y: MotionValue<number>
+  bounds: React.RefObject<HTMLDivElement>
+}) {
   const setOpen = useStore((s) => s.setOpen)
   const needsAccess = useStore((s) => s.needsAccess)
   const ref = useRef<HTMLDivElement>(null)
+  const drag = useDragControls()
 
   // Escape closes the panel while focus is inside it.
   useEffect(() => {
@@ -214,14 +233,21 @@ function Panel({ maxHeight, width }: { maxHeight: number; width: number }) {
       ref={ref}
       role="dialog"
       aria-label="SparePage print check"
-      initial={{ opacity: 0, scale: 0.96, y: 8 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.98, y: 4, transition: { duration: 0.12, ease: 'easeIn' } }}
+      // Dragged by the header only, so scrolling the list or selecting text never moves it.
+      drag
+      dragControls={drag}
+      dragListener={false}
+      dragMomentum={false}
+      dragElastic={0}
+      dragConstraints={bounds}
+      initial={{ opacity: 0, scale: 0.96 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.12, ease: 'easeIn' } }}
       transition={{ duration: 0.18, ease: EASE_OUT }}
-      style={{ transformOrigin: 'bottom right', maxHeight, width }}
+      style={{ transformOrigin: 'bottom right', maxHeight, width, x, y }}
       className="pointer-events-auto flex flex-col overflow-hidden rounded-2xl border border-leaf-100 bg-paper shadow-panel"
     >
-      <PanelHeader />
+      <PanelHeader drag={drag} />
       {needsAccess ? (
         <ConnectPrompt />
       ) : (
@@ -239,7 +265,7 @@ function Panel({ maxHeight, width }: { maxHeight: number; width: number }) {
   )
 }
 
-function PanelHeader() {
+function PanelHeader({ drag }: { drag: DragControls }) {
   const setOpen = useStore((s) => s.setOpen)
   const reanalyze = useStore((s) => s.reanalyze)
   const loading = useStore((s) => s.loading)
@@ -247,7 +273,13 @@ function PanelHeader() {
   const docSource = useStore((s) => s.docSource)
 
   return (
-    <header className="flex items-center gap-1.5 border-b border-leaf-100 bg-white px-3 py-1.5">
+    <header
+      onPointerDown={(e) => {
+        if (!(e.target as Element).closest('button')) drag.start(e)
+      }}
+      title="Drag to move"
+      className="flex cursor-grab touch-none select-none items-center gap-1.5 border-b border-leaf-100 bg-white px-3 py-1.5 active:cursor-grabbing"
+    >
       <img src={logoUrl()} alt="" className="h-5 w-5" />
       <div className="min-w-0 flex-1 truncate text-[13px] font-semibold leading-tight text-bark-900">
         SparePage

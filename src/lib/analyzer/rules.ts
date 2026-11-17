@@ -71,30 +71,51 @@ function detectHighlights(doc: DocModel): Flag[] {
 function detectFontSize(doc: DocModel): Flag[] {
   const flags: Flag[] = []
   const threshold = doc.defaultFontSize + 1
+  const to = doc.defaultFontSize
+  // Back-to-back oversized text at the same size (a run of 14pt bullets or paragraphs) is one
+  // fix, so it gets one card. A heading, a different size or any normal-size text in between
+  // ends the stretch, because the fix resizes everything inside its range.
+  let cur: { size: number; start: number; end: number; chars: number } | null = null
+  const close = () => {
+    if (!cur) return
+    const { size, start, end, chars } = cur
+    const range: Range = { start, end }
+    const linesSaved = (chars / CHARS_PER_LINE) * (1 - to / size)
+    flags.push({
+      id: fid('fontSize'),
+      type: 'fontSize',
+      severity: size >= 16 ? 'high' : 'medium',
+      range,
+      title: `Body text is ${size}pt`,
+      explanation: `This text is set at ${size}pt. Dropping body text to ${to}pt keeps it readable while fitting more on each page.`,
+      before: `${size}pt`,
+      after: `${to}pt`,
+      impact: { paper: linesSaved / doc.linesPerPage, ink: 0 },
+      action: { kind: 'setFontSize', range, from: size, to },
+    })
+    cur = null
+  }
   for (const p of doc.paragraphs) {
-    if (p.kind === 'heading') continue // headings are allowed to be large
+    if (p.kind === 'heading') {
+      close() // headings are allowed to be large
+      continue
+    }
     for (const r of p.runs) {
-      if (r.fontSize > threshold && r.text.trim()) {
-        const range: Range = { start: r.start!, end: r.end! }
-        const to = doc.defaultFontSize
-        const linesSaved =
-          (r.text.length / CHARS_PER_LINE) * (1 - to / r.fontSize)
-        const impact: EcoImpact = { paper: linesSaved / doc.linesPerPage, ink: 0 }
-        flags.push({
-          id: fid('fontSize'),
-          type: 'fontSize',
-          severity: r.fontSize >= 16 ? 'high' : 'medium',
-          range,
-          title: `Body text is ${r.fontSize}pt`,
-          explanation: `This paragraph is set at ${r.fontSize}pt. Dropping body text to ${to}pt keeps it readable while fitting more on each page.`,
-          before: `${r.fontSize}pt`,
-          after: `${to}pt`,
-          impact,
-          action: { kind: 'setFontSize', range, from: r.fontSize, to },
-        })
+      if (!r.text.trim()) continue
+      if (r.fontSize <= threshold) {
+        close()
+        continue
+      }
+      if (cur && cur.size !== r.fontSize) close()
+      if (cur) {
+        cur.end = r.end!
+        cur.chars += r.text.length
+      } else {
+        cur = { size: r.fontSize, start: r.start!, end: r.end!, chars: r.text.length }
       }
     }
   }
+  close()
   return flags
 }
 

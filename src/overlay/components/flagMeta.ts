@@ -1,4 +1,4 @@
-import type { FlagType, Severity } from '../../lib/analyzer/types'
+import type { FlagType } from '../../lib/analyzer/types'
 
 const PAPER = { label: 'Paper', accent: 'bg-sky-100 text-sky-800' }
 const INK = { label: 'Ink', accent: 'bg-amber-100 text-amber-800' }
@@ -16,13 +16,17 @@ export const FLAG_META: Record<FlagType, { label: string; accent: string }> = {
   wideIndents: PAPER,
 }
 
-/** Paper saved, always in pages so every number in the panel reads the same way. */
-export function formatPages(p: number): string {
-  return `${p < 0.1 ? '<0.1' : p.toFixed(1)} pg`
-}
-
-export const SEVERITY_DOT: Record<Severity, string> = {
-  low: 'bg-leaf-400',
-  medium: 'bg-amber-400',
-  high: 'bg-rose-500',
+/** One dot colour per kind of issue, so each kind is recognisable at a glance in the list
+ *  (the way LanguageTool colours spelling, grammar and style differently). */
+export const TYPE_DOT: Record<FlagType, { name: string; dot: string }> = {
+  highlight: { name: 'Highlight', dot: 'bg-amber-400' },
+  fontSize: { name: 'Font size', dot: 'bg-sky-500' },
+  doubleSpacing: { name: 'Empty lines', dot: 'bg-violet-500' },
+  blankPage: { name: 'Blank page', dot: 'bg-rose-500' },
+  pageBreak: { name: 'Page break', dot: 'bg-pink-400' },
+  bulletSprawl: { name: 'Bullet list', dot: 'bg-teal-500' },
+  verbose: { name: 'Wordy text', dot: 'bg-leaf-600' },
+  largeImage: { name: 'Large image', dot: 'bg-indigo-500' },
+  wideMargins: { name: 'Margins', dot: 'bg-orange-500' },
+  wideIndents: { name: 'Indents', dot: 'bg-lime-500' },
 }
