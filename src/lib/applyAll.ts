@@ -37,8 +37,9 @@ export async function applyAllFixes(
   while (steps++ < maxSteps) {
     // Next flag we haven't attempted yet this run. A fix that resolves its flag drops it
     // from the list; a no-op fix leaves it, but it's now marked tried so we move past it.
-    // Fixes marked reviewFirst (they leave out whole sentences) are only ever applied by hand.
-    const flag = flags.find((f) => !f.reviewFirst && !tried.has(signature(f)))
+    // Fixes marked reviewFirst (they leave out whole sentences) are only ever applied by hand,
+    // and so are manualReason ones (SparePage can't make that change at all).
+    const flag = flags.find((f) => !f.reviewFirst && !f.manualReason && !tried.has(signature(f)))
     if (!flag) break
     tried.add(signature(flag))
     try {

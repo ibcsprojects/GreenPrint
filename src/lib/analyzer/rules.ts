@@ -355,6 +355,7 @@ function detectLargeImages(doc: DocModel): Flag[] {
       flags.push({
         id: fid('image'),
         type: 'largeImage',
+        ...(img.manualReason ? { manualReason: img.manualReason } : {}),
         severity: ratio > 0.5 ? 'high' : 'medium',
         range,
         title: `Image fills ${pct}% of the page`,
@@ -511,7 +512,8 @@ export function analyzeDoc(doc: DocModel): Flag[] {
 
 /** Total estimated saving across a set of flags. */
 export function totalImpact(flags: Flag[]): EcoImpact {
-  return flags.reduce<EcoImpact>(
+  // Fixes SparePage can't make itself aren't savings it can promise.
+  return flags.filter((f) => !f.manualReason).reduce<EcoImpact>(
     (acc, f) => ({ paper: acc.paper + f.impact.paper, ink: acc.ink + f.impact.ink }),
     { paper: 0, ink: 0 },
   )

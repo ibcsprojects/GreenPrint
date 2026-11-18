@@ -110,6 +110,11 @@ function FlagIssueBody({ flag }: { flag: Flag }) {
           </ul>
         </div>
       )}
+      {flag.manualReason && (
+        <p className="mt-2 rounded-md bg-amber-50 px-2 py-1.5 text-[11px] text-bark-800">
+          {flag.manualReason}
+        </p>
+      )}
       {flag.reviewFirst && (
         <p className="mt-2 rounded-md bg-amber-50 px-2 py-1.5 text-[11px] text-bark-800">
           This one leaves out whole sentences, so it is not part of Apply all. Read it, edit it if
@@ -118,14 +123,16 @@ function FlagIssueBody({ flag }: { flag: Flag }) {
       )}
 
       <div className="mt-2.5 flex items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => apply(flag.id, editing ? draft : undefined)}
-          disabled={busy}
-          className="rounded-lg bg-leaf-700 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-leaf-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-leaf-700 disabled:opacity-50"
-        >
-          {busy ? 'Applying…' : 'Apply'}
-        </button>
+        {!flag.manualReason && (
+          <button
+            type="button"
+            onClick={() => apply(flag.id, editing ? draft : undefined)}
+            disabled={busy}
+            className="rounded-lg bg-leaf-700 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-leaf-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-leaf-700 disabled:opacity-50"
+          >
+            {busy ? 'Applying…' : 'Apply'}
+          </button>
+        )}
         <button
           type="button"
           onClick={() => dismiss(flag.id)}

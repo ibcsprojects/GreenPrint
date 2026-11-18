@@ -1,6 +1,6 @@
 {
   "name": "sparepage",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "private": true,
   "description": "SparePage: an eco-formatting assistant for Google Docs. Flags wasteful print formatting and suggests paper and ink saving fixes you accept one at a time.",
   "type": "module",

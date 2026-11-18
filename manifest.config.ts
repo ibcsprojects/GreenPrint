@@ -17,7 +17,7 @@ const forStore = process.env.SPAREPAGE_STORE === '1'
 export default defineManifest({
   manifest_version: 3,
   name: 'SparePage: Eco Formatting for Docs',
-  version: '0.2.1',
+  version: '0.2.2',
   ...(forStore ? {} : { key: EXTENSION_KEY }),
   description:
     'Spots print waste in Google Docs (highlights, big fonts, blank pages, wordy text) and fixes it in one click. Runs in your browser.',

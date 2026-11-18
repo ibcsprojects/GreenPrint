@@ -65,4 +65,7 @@ export interface Flag {
   /** The fix leaves out whole sentences, so it's offered for a careful read and is never
    *  part of an "apply all". */
   reviewFirst?: boolean
+  /** The fix can't be done from here (e.g. a Google Drawing can't be resized through the
+   *  API). Shown as a note with no Apply button, and never part of "apply all". */
+  manualReason?: string
 }

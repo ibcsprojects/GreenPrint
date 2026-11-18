@@ -69,7 +69,7 @@ function render() {
     ),
   )
   const bar = el('div', 'fx-actions')
-  const quick = flags.filter((f) => !f.reviewFirst)
+  const quick = flags.filter((f) => !f.reviewFirst && !f.manualReason)
   if (quick.length > 0) {
     const all = el('button', 'btn btn-primary', `Apply all ${plural(quick.length, 'fix', 'fixes')}`)
     all.type = 'button'

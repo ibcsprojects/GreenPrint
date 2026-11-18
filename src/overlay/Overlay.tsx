@@ -423,7 +423,7 @@ function ApplyAllBar() {
   const loading = useStore((s) => s.loading)
   const applyAll = useStore((s) => s.applyAll)
   // Fixes that leave out whole sentences are applied one at a time, after reading them.
-  const count = flags.filter((f) => !f.reviewFirst).length
+  const count = flags.filter((f) => !f.reviewFirst && !f.manualReason).length
   if (count === 0) return null
   return (
     <div className="border-t border-leaf-100 bg-white px-3 py-2.5">

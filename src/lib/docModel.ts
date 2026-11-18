@@ -38,6 +38,10 @@ export interface DocImage {
   /** Image source URL (sourceUri, else the short-lived contentUri). Required to re-insert
    *  at a smaller size; absent for some uploaded/pasted images, which then can't be resized. */
   uri?: string
+  /** Why this picture can't be shrunk by deleting and re-inserting it (a Google Drawing, a
+   *  linked chart, a cropped or rotated picture, no usable source URL). Set, it is flagged
+   *  for a by-hand resize instead of a one-click fix. */
+  manualReason?: string
 }
 
 export interface Paragraph {

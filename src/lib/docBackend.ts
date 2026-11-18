@@ -210,28 +210,37 @@ export class GoogleDocsBackend implements EditBackend {
     if (!img || img.docStart == null) {
       throw new Error("Couldn't locate that image in the document to resize it.")
     }
-    if (!img.uri) {
+    if (img.manualReason || !img.uri) {
       throw new Error(
-        "This image has no shareable source URL, so the Docs API can't re-insert it at a smaller size. Resize it by hand by dragging a corner handle.",
+        img.manualReason ??
+          "This image has no shareable source URL, so the Docs API can't re-insert it at a smaller size. Resize it by hand by dragging a corner handle.",
       )
     }
     const width = Math.round(img.widthPt * action.scale)
     const height = Math.round(img.heightPt * action.scale)
     // Delete the one-index image element, then insert the resized image where it was. In a
     // single batch these apply in order, so the insert index is the freed slot.
-    await pushBatchUpdate(this.documentId, [
-      { deleteContentRange: { range: { startIndex: img.docStart, endIndex: img.docStart + 1 } } },
-      {
-        insertInlineImage: {
-          uri: img.uri,
-          location: { index: img.docStart },
-          objectSize: {
-            width: { magnitude: width, unit: 'PT' },
-            height: { magnitude: height, unit: 'PT' },
+    try {
+      await pushBatchUpdate(this.documentId, [
+        { deleteContentRange: { range: { startIndex: img.docStart, endIndex: img.docStart + 1 } } },
+        {
+          insertInlineImage: {
+            uri: img.uri,
+            location: { index: img.docStart },
+            objectSize: {
+              width: { magnitude: width, unit: 'PT' },
+              height: { magnitude: height, unit: 'PT' },
+            },
           },
         },
-      },
-    ])
+      ])
+    } catch {
+      // The batch is all-or-nothing, so the picture is still there, untouched. The usual cause
+      // is that Google couldn't fetch the picture's source to put it back.
+      throw new Error(
+        "Google couldn't re-insert this picture at a smaller size, so it was left as it is. Click it and drag a corner handle to resize it.",
+      )
+    }
     return fetchGoogleDoc(this.documentId)
   }
 

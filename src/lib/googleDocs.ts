@@ -213,7 +213,22 @@ interface ApiInlineObject {
   inlineObjectProperties?: {
     embeddedObject?: {
       size?: { height?: ApiDimension; width?: ApiDimension }
-      imageProperties?: { contentUri?: string; sourceUri?: string }
+      imageProperties?: {
+        contentUri?: string
+        sourceUri?: string
+        angle?: number
+        cropProperties?: {
+          offsetLeft?: number
+          offsetRight?: number
+          offsetTop?: number
+          offsetBottom?: number
+          angle?: number
+        }
+      }
+      /** Present for a Google Drawing: it has no image URL, so it can't be re-inserted. */
+      embeddedDrawingProperties?: unknown
+      /** Present for a chart linked to a Google Sheet. */
+      linkedContentReference?: unknown
     }
   }
 }
@@ -400,9 +415,49 @@ function mapImages(
     // sourceUri (the original public URL) re-inserts most reliably; contentUri is a
     // short-lived, account-tagged fallback for uploaded/pasted images.
     const uri = embedded?.imageProperties?.sourceUri || embedded?.imageProperties?.contentUri
-    if (widthPt && heightPt) images.push({ objectId, widthPt, heightPt, docStart: e.startIndex, uri })
+    const manualReason = whyNotResizable(embedded, uri)
+    if (widthPt && heightPt) {
+      images.push({
+        objectId,
+        widthPt,
+        heightPt,
+        docStart: e.startIndex,
+        uri,
+        ...(manualReason ? { manualReason } : {}),
+      })
+    }
   }
   return images
+}
+
+/**
+ * The Docs API can't resize a picture in place, so a resize deletes it and inserts it again
+ * from its source URL. That only keeps the picture intact when it is a plain image with a
+ * URL; anything else would be lost or changed, so it is left for the user to resize by hand.
+ */
+export function whyNotResizable(
+  embedded: NonNullable<NonNullable<ApiInlineObject['inlineObjectProperties']>['embeddedObject']> | undefined,
+  uri: string | undefined,
+): string | undefined {
+  const drag = 'Click it and drag a corner handle to make it smaller.'
+  if (!embedded) return `SparePage can't resize this one. ${drag}`
+  if (embedded.embeddedDrawingProperties) {
+    return `This is a Google Drawing, and Google doesn't let extensions resize drawings. ${drag}`
+  }
+  if (embedded.linkedContentReference) {
+    return `This is a chart linked to a Google Sheet. Re-inserting it would cut the link. ${drag}`
+  }
+  const props = embedded.imageProperties
+  const crop = props?.cropProperties
+  const cropped = [crop?.offsetLeft, crop?.offsetRight, crop?.offsetTop, crop?.offsetBottom].some(
+    (n) => (n ?? 0) > 0.001,
+  )
+  if (cropped) return `This picture is cropped, and re-inserting it would undo the crop. ${drag}`
+  if (Math.abs(props?.angle ?? 0) > 0.001 || Math.abs(crop?.angle ?? 0) > 0.001) {
+    return `This picture is rotated, and re-inserting it would undo the rotation. ${drag}`
+  }
+  if (!uri) return `Google gave no source for this picture, so it can't be put back smaller. ${drag}`
+  return undefined
 }
 
 function mapRun(e: ApiElement): TextRun {

@@ -52,7 +52,7 @@ export function renderFlagCards(flags: Flag[], o: CardOptions): HTMLUListElement
     if (f.reviewFirst) {
       li.append(el('p', 'fx-unsupported', 'This one leaves out whole sentences, so it is not part of Apply all. Read it, then apply it if you agree.'))
     }
-    const why = o.unsupported?.(f) ?? null
+    const why = f.manualReason ?? o.unsupported?.(f) ?? null
     if (why) li.append(el('p', 'fx-unsupported', why))
     const foot = el('div', 'fx-foot')
     if (f.impact.paper >= 0.05) foot.append(el('span', 'fx-saves', `Saves about ${f.impact.paper.toFixed(1)} of a page`))
