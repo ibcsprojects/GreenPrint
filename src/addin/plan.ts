@@ -17,7 +17,7 @@ export interface WordPara {
 
 export type Alignment = { ok: true; wordIndex: (number | null)[] } | { ok: false; reason: string }
 
-const norm = (s: string) => s.replace(/[\s ]+/g, ' ').trim()
+export const norm = (s: string) => s.replace(/[\s ]+/g, ' ').trim()
 
 /**
  * Pair each model paragraph with the matching entry in Word's paragraph list. Any doubt
@@ -50,12 +50,14 @@ export function alignParagraphs(model: DocModel, kinds: TopKind[], word: WordPar
   return { ok: true, wordIndex }
 }
 
-export type Op =
+/** `expect` is the paragraph's text as read, so a step can check it is still on the right one. */
+export type Op = { expect?: string } & (
   | { op: 'deleteParagraph'; at: number }
   | { op: 'setIndent'; at: number; left: boolean; right: boolean }
   | { op: 'scalePictures'; at: number; scale: number; only?: number }
   | { op: 'setFont'; at: number; size?: number; clearHighlight?: boolean; alt?: 'underline' | 'italic' }
   | { op: 'replaceText'; at: number; text: string }
+)
 
 export type Plan = { ok: true; ops: Op[] } | { ok: false; reason: string }
 
@@ -67,6 +69,8 @@ const NEEDS_FILE_TOOL = 'Use the Word file tool for this one.'
 export function planAction(action: EditAction, model: DocModel, map: (number | null)[]): Plan {
   const ps = model.paragraphs
   const at = (k: number) => map[k]
+  /** The text a step expects to find, or nothing for an opaque paragraph (field, shape). */
+  const want = (k: number) => (ps[k].kind === 'table' ? undefined : norm(paragraphText(ps[k])))
   const hit = (pred: (k: number) => boolean) => ps.map((_, k) => k).filter((k) => pred(k) && at(k) != null)
 
   switch (action.kind) {
@@ -80,13 +84,13 @@ export function planAction(action: EditAction, model: DocModel, map: (number | n
       const before = ps[blanks[0] - 1]
       const trailing = last === ps.length - 1
       const drop = trailing && before && before.kind !== 'table' ? blanks : blanks.slice(0, -1)
-      return { ok: true, ops: drop.map((k) => ({ op: 'deleteParagraph' as const, at: at(k)! })) }
+      return { ok: true, ops: drop.map((k) => ({ op: 'deleteParagraph' as const, at: at(k)!, expect: want(k) })) }
     }
 
     case 'reduceIndents': {
       const ops: Op[] = hit((k) => overlaps(action.range, ps[k]) && hasWideIndent(ps[k])).map((k) => {
         const s = wideIndentSides(ps[k])
-        return { op: 'setIndent' as const, at: at(k)!, left: s.left, right: s.right }
+        return { op: 'setIndent' as const, at: at(k)!, left: s.left, right: s.right, expect: want(k) }
       })
       return { ok: true, ops }
     }
@@ -96,7 +100,7 @@ export function planAction(action: EditAction, model: DocModel, map: (number | n
       for (const k of hit((k) => !!ps[k].images?.length && (!!action.objectId || within(action.range, ps[k])))) {
         ps[k].images!.forEach((img, n) => {
           if (action.objectId && img.objectId !== action.objectId) return
-          ops.push({ op: 'scalePictures', at: at(k)!, scale: action.scale, only: n })
+          ops.push({ op: 'scalePictures', at: at(k)!, scale: action.scale, only: n, expect: want(k) })
         })
       }
       return { ok: true, ops }
@@ -113,8 +117,8 @@ export function planAction(action: EditAction, model: DocModel, map: (number | n
         }
         ops.push(
           action.kind === 'setFontSize'
-            ? { op: 'setFont', at: at(k)!, size: action.to }
-            : { op: 'setFont', at: at(k)!, clearHighlight: true, alt: action.alt },
+            ? { op: 'setFont', at: at(k)!, size: action.to, expect: want(k) }
+            : { op: 'setFont', at: at(k)!, clearHighlight: true, alt: action.alt, expect: want(k) },
         )
       }
       return { ok: true, ops }
@@ -122,7 +126,7 @@ export function planAction(action: EditAction, model: DocModel, map: (number | n
 
     case 'replaceText': {
       const k = hit((k) => overlaps(action.range, ps[k]))[0]
-      return k == null ? { ok: true, ops: [] } : { ok: true, ops: [{ op: 'replaceText', at: at(k)!, text: action.text }] }
+      return k == null ? { ok: true, ops: [] } : { ok: true, ops: [{ op: 'replaceText', at: at(k)!, text: action.text, expect: want(k) }] }
     }
 
     case 'pageBreakToRule':

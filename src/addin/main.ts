@@ -10,6 +10,7 @@ const status = $('status')
 const actions = $('actions')
 const results = $('results')
 
+const SLOW = 'Reading your document. This can take a minute for large documents.'
 const session = new WordSession()
 let busy = false
 
@@ -27,18 +28,35 @@ function setStatus(text: string, error = false) {
   status.classList.toggle('is-error', error)
 }
 
-async function run(task: () => Promise<unknown>) {
-  if (busy) return
-  busy = true
-  setStatus('Working…')
+/** The scroll position of the pane, so rebuilding the list doesn't throw the user to the top. */
+const scroller = () => document.scrollingElement ?? document.documentElement
+
+/** Jump to an issue. Changes nothing in the pane, so the list stays put. */
+async function runQuiet(task: () => Promise<unknown>) {
+  if (busy) return setStatus('Still working on the last click. One moment.')
+  setStatus('')
   try {
     await task()
-    setStatus('')
+  } catch (err) {
+    setStatus(String((err as Error)?.message ?? err), true)
+  }
+}
+
+async function run(task: () => Promise<unknown>, working = 'Working…') {
+  if (busy) return setStatus('Still working on the last click. One moment.')
+  busy = true
+  setStatus(working)
+  try {
+    await task()
+    setStatus(session.note)
+    session.note = ''
   } catch (err) {
     setStatus(`That didn't work: ${String((err as Error)?.message ?? err)}`, true)
   }
   busy = false
+  const top = scroller().scrollTop
   render()
+  scroller().scrollTop = top
 }
 
 function render() {
@@ -46,7 +64,7 @@ function render() {
   summary.textContent =
     flags.length === 0
       ? `No print waste found. About ${plural(session.pages, 'page')} (an estimate).`
-      : `About ${plural(session.pages, 'page')} (an estimate), ${plural(flags.length, 'issue')} found.`
+      : `About ${plural(session.pages, 'page')} (an estimate), ${plural(flags.length, 'issue')} left.${session.dirty ? ' Choose Scan again to refresh the page count.' : ''}`
 
   actions.replaceChildren()
   const apply = session.applicableCount
@@ -58,7 +76,7 @@ function render() {
   }
   const again = el('button', 'btn btn-quiet', 'Scan again')
   again.type = 'button'
-  again.addEventListener('click', () => void run(() => session.scan()))
+  again.addEventListener('click', () => void run(() => session.scan(), SLOW))
   actions.append(again)
 
   results.replaceChildren()
@@ -66,7 +84,7 @@ function render() {
   results.append(
     renderFlagCards(flags, {
       onApply: (f) => void run(() => session.apply(f)),
-      onShow: (f) => void run(() => session.show(f)),
+      onShow: (f) => void runQuiet(() => session.show(f)),
       unsupported: (f) => session.unsupported(f),
     }),
   )
@@ -77,5 +95,5 @@ Office.onReady(async (info) => {
     summary.textContent = 'SparePage for Word only runs inside Microsoft Word.'
     return
   }
-  await run(() => session.scan())
+  await run(() => session.scan(), SLOW)
 })

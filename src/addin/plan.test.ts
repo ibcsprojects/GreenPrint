@@ -57,7 +57,14 @@ describe('planAction', () => {
 
   it('deletes extra blank lines but keeps one', () => {
     const out = plan(p(r('a')) + '<w:p/><w:p/><w:p/>' + p(r('b')), 'doubleSpacing')
-    expect(out).toEqual({ ok: true, ops: [{ op: 'deleteParagraph', at: 1 }, { op: 'deleteParagraph', at: 2 }] })
+    expect(out).toEqual({ ok: true, ops: [{ op: 'deleteParagraph', at: 1, expect: '' }, { op: 'deleteParagraph', at: 2, expect: '' }] })
+    // every step carries the text it expects, so a stale position is caught before any edit
+    expect((out as { ops: { expect?: string }[] }).ops.every((o) => o.expect !== undefined)).toBe(true)
+  })
+
+  it('records the paragraph text each step expects to find', () => {
+    const out = plan(p(r('All marked', '<w:highlight w:val="yellow"/>')), 'highlight')
+    expect(out).toMatchObject({ ok: true, ops: [{ expect: 'All marked' }] })
   })
 
   it('formats a fully highlighted paragraph, and refuses a partly highlighted one', () => {
